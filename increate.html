@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>數字逐漸增加示範</title>
+    <style>
+        #counter {
+            font-size: 48px;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="counter">0</div>
+
+<script>
+function animateNumber(target, duration = 2000) {
+    const counter = document.getElementById('counter');
+    let start = 0;
+    const stepTime = 20; // 每 20 毫秒更新一次
+    const steps = duration / stepTime;
+    const increment = target / steps;
+
+    const interval = setInterval(() => {
+        start += increment;
+        if (start >= target) {
+            start = target; // 保證最後數字精準
+            clearInterval(interval);
+        }
+        counter.textContent = Math.floor(start); // 直接顯示純數字
+    }, stepTime);
+}
+
+// 範例：數字從 0 增加到 12345
+animateNumber(12345, 300000); // 3秒
+</script>
+
+</body>
+</html>

@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>遊戲經驗值監控</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <script src="tesseract.min.js"></script>
+    <style>
+        body {
+            background: gray;
+        }
+
+        /* basic style */
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .controls {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .controls button {
+            margin: 0 10px;
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        #startCapture {
+            background: #4CAF50;
+            color: white;
+        }
+
+        #startCapture:hover {
+            background: #45a049;
+        }
+
+        #stopCapture {
+            background: #f44336;
+            color: white;
+        }
+
+        #stopCapture:hover:not(:disabled) {
+            background: #da190b;
+        }
+
+        #selectArea {
+            background: #2196F3;
+            color: white;
+        }
+
+        #selectArea:hover:not(:disabled) {
+            background: #1976D2;
+        }
+
+        button:disabled {
+            background: #cccccc !important;
+            cursor: not-allowed;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-item {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #2196F3;
+        }
+
+        .stat-item label {
+            display: block;
+            font-weight: bold;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .stat-item span {
+            font-size: 18px;
+            color: #333;
+        }
+
+        /* overlay */
+        .area-selector-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+
+        .selector-container {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .selector-container h3 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .image-container {
+            position: relative;
+            display: inline-block;
+            margin: 20px 0;
+            text-align: center;
+            width: 100%;
+        }
+
+        .image-container img {
+            max-width: 800px;
+            max-height: 500px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: crosshair;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .selection-box {
+            position: absolute;
+            border: 2px dashed #ff6b6b;
+            background: rgba(255, 107, 107, 0.15);
+            pointer-events: none;
+            display: none;
+            border-radius: 4px;
+        }
+
+        .selector-controls {
+            text-align: center;
+            margin-top: 25px;
+        }
+
+        .selector-controls button {
+            margin: 0 10px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        #confirmSelection {
+            background: #4CAF50;
+            color: white;
+        }
+
+        #confirmSelection:hover:not(:disabled) {
+            background: #45a049;
+        }
+
+        #confirmSelection:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+
+        #retakeScreenshot {
+            background: #2196F3;
+            color: white;
+        }
+
+        #retakeScreenshot:hover {
+            background: #1976D2;
+        }
+
+        #cancelSelection {
+            background: #f44336;
+            color: white;
+        }
+
+        #cancelSelection:hover {
+            background: #da190b;
+        }
+
+        /* status */
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f1b0b7;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #b8daff;
+        }
+
+        /* preview */
+        .preview-area {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+
+        .preview-area.has-selection {
+            border-color: #4CAF50;
+            background: #f1f8e9;
+        }
+
+        #selectedAreaPreview {
+            max-width: 200px;
+            max-height: 100px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        /* log */
+        .log-section {
+            margin-top: 30px;
+        }
+
+        .log-section h3 {
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        #monitorLog {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            height: 150px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>遊戲經驗值監控工具</h1>
+        
+        <div class="controls">
+            <button id="startCapture">🎥 開始螢幕擷取</button>
+            <button id="stopCapture" disabled>⏹️ 停止監控</button>
+            <button id="selectArea" disabled>📍 選擇經驗值區域</button>
+        </div>
+        
+        <!-- status-display -->
+        <div id="statusMessage" class="status" style="display: none;"></div>
+        
+        <!-- previewArea -->
+        <div class="preview-area" id="previewArea">
+            <p>尚未選擇監控區域</p>
+            <canvas id="selectedAreaPreview" style="display: none;"></canvas>
+            <div id="areaInfo" style="display: none;">
+                <p>已選擇區域: <span id="areaCoords"></span></p>
+                <p>區域大小: <span id="areaSize"></span></p>
+            </div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <label>初始經驗:</label>
+                <span id="initExp">--</span>
+            </div>
+            <div class="stat-item">
+                <label>當前經驗值:</label>
+                <span id="currentExp">--</span>
+            </div>
+            <div class="stat-item">
+                <label>經驗相差:</label>
+                <span id="expDiff">--</span>
+            </div>
+            <div class="stat-item">
+                <label>監控時長:</label>
+                <span id="monitorTime">--</span>
+            </div>
+        </div>
+        
+        <!-- log-section -->
+        <div class="log-section">
+            <h3>監控日誌</h3>
+            <div id="monitorLog"></div>
+        </div>
+        
+        <!-- display none capture msg -->
+        <canvas id="preview" style="display:none;"></canvas>
+        <video id="screenVideo" style="display:none;" autoplay></video>
+    </div>
+
+    <!-- selector-overlay -->
+    <div class="area-selector-overlay" id="areaSelectorOverlay">
+        <div class="selector-container">
+            <h3>請在下方截圖中框選經驗值區域</h3>
+            <div class="image-container">
+                <img id="screenshot" draggable="false"/>
+                <div id="selection-box" class="selection-box"></div>
+            </div>
+            <div class="selector-controls">
+                <button id="confirmSelection" disabled>確認選擇</button>
+                <button id="cancelSelection">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ExpMonitor {
+            constructor() {
+                this.stream = null;
+                this.video = null;
+                this.canvas = null;
+                this.ctx = null;
+                this.isMonitoring = false;
+                this.hasSetInitialExp = false;
+                this.selectedArea = null;
+                this.initExpNum = null;
+                this.startTime = null;
+                this.monitorInterval = null;
+                this.tenMinuteTimeout = null;
+                this.isProcessingOCR = false;
+                this.timeupMin = "1";
+                this.timeupSec = "0"
+                this.init();
+            }
+            
+            init() {
+                this.video = document.getElementById('screenVideo');
+                this.canvas = document.getElementById('preview');
+                this.ctx = this.canvas.getContext('2d');
+                
+                document.getElementById('startCapture').onclick = () => this.startCapture();
+                document.getElementById('stopCapture').onclick = () => this.stopCapture();
+                document.getElementById('selectArea').onclick = () => this.showAreaSelector();
+                
+                // selector-event
+                document.getElementById('confirmSelection').onclick = () => this.confirmAreaSelection();
+                document.getElementById('cancelSelection').onclick = () => this.cancelAreaSelection();
+                
+                this.log('系統已準備就緒');
+            }
+            
+            async startCapture() {
+                try { 
+                    this.showStatus('正在請求螢幕共享權限...', 'info');
+                    
+                    this.stream = await navigator.mediaDevices.getDisplayMedia({
+                        video: {
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                            frameRate: { ideal: 10 }
+                        }
+                    });
+                    
+                    this.video.srcObject = this.stream;
+                    
+                    this.video.onloadedmetadata = () => {
+                        this.canvas.width = this.video.videoWidth;
+                        this.canvas.height = this.video.videoHeight;
+                        
+                        document.getElementById('startCapture').disabled = true;
+                        document.getElementById('stopCapture').disabled = false;
+                        document.getElementById('selectArea').disabled = false;
+                        
+                        this.showStatus('螢幕捕獲已開始，請選擇經驗值區域', 'success');
+                        this.log('螢幕捕獲開始');
+                    };
+                    
+                    this.stream.getVideoTracks()[0].onended = () => {
+                        this.stopCapture();
+                        this.showStatus('螢幕共享已結束', 'info');
+                    };
+                    
+                } catch (err) {
+                    console.error('無法開始螢幕捕獲:', err);
+                    this.showStatus('無法開始螢幕捕獲，請確保瀏覽器支援並給予權限', 'error');
+                    this.log('錯誤: ' + err.message);
+                }
+            }
+            
+            stopCapture() {
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.stream = null;
+                }
+                
+                this.stopMonitoring();
+                document.getElementById('startCapture').disabled = false;
+                document.getElementById('stopCapture').disabled = true;
+                document.getElementById('selectArea').disabled = true;
+                
+                this.calculateExpRates();
+
+                this.selectedArea = null;
+                this.updatePreviewArea();
+                this.initExpNum = null;
+                this.showStatus('已停止所有監控', 'info');
+                this.log('螢幕捕獲停止');
+            }
+            
+            showAreaSelector() {
+                if (!this.video || !this.stream) {
+                    this.showStatus('請先開始螢幕擷取', 'error');
+                    return;
+                }
+                
+                // Capture the current screen as a screenshot
+                this.ctx.drawImage(this.video, 0, 0);
+                const imageDataUrl = this.canvas.toDataURL();
+                
+                // Show Selector
+                const screenshot = document.getElementById('screenshot');
+                screenshot.src = imageDataUrl;
+                
+                document.getElementById('areaSelectorOverlay').style.display = 'flex';
+                
+                this.setupSelectionEvents();
+                this.log('開啟區域選擇器');
+            }
+            
+            setupSelectionEvents() {
+                const img = document.getElementById('screenshot');
+                const selectionBox = document.getElementById('selection-box');
+                let isSelecting = false;
+                let startX, startY;
+                
+                // Reset selection box
+                selectionBox.style.display = 'none';
+                document.getElementById('confirmSelection').disabled = true;
+                
+                img.onmousedown = (e) => {
+                    isSelecting = true;
+                    const rect = img.getBoundingClientRect();
+                    startX = e.clientX - rect.left;
+                    startY = e.clientY - rect.top;
+                    
+                    selectionBox.style.left = startX + 'px';
+                    selectionBox.style.top = startY + 'px';
+                    selectionBox.style.width = '0px';
+                    selectionBox.style.height = '0px';
+                    selectionBox.style.display = 'block';
+                };
+                
+                img.onmousemove = (e) => {
+                    if (!isSelecting) return;
+                    
+                    const rect = img.getBoundingClientRect();
+                    const currentX = e.clientX - rect.left;
+                    const currentY = e.clientY - rect.top;
+                    
+                    const width = Math.abs(currentX - startX);
+                    const height = Math.abs(currentY - startY);
+                    const left = Math.min(startX, currentX);
+                    const top = Math.min(startY, currentY);
+                    
+                    selectionBox.style.left = left + 'px';
+                    selectionBox.style.top = top + 'px';
+                    selectionBox.style.width = width + 'px';
+                    selectionBox.style.height = height + 'px';
+                };
+                
+                img.onmouseup = (e) => {
+                    if (isSelecting) {
+                        const rect = img.getBoundingClientRect();
+                        const endX = e.clientX - rect.left;
+                        const endY = e.clientY - rect.top;
+                        
+                        // Calculate actual coordinates (taking image scaling into account)
+                        const scaleX = this.video.videoWidth / img.clientWidth;
+                        const scaleY = this.video.videoHeight / img.clientHeight;
+                        
+                        const area = {
+                            x: Math.min(startX, endX) * scaleX,
+                            y: Math.min(startY, endY) * scaleY,
+                            width: Math.abs(endX - startX) * scaleX,
+                            height: Math.abs(endY - startY) * scaleY
+                        };
+                        
+                        this.tempSelectedArea = area;
+                        document.getElementById('confirmSelection').disabled = false;
+                        this.log(`已選擇區域: ${Math.round(area.width)}x${Math.round(area.height)}`);
+                        isSelecting = false;
+                    }
+                };
+            }
+            
+            confirmAreaSelection() {
+                if (this.tempSelectedArea) {
+                    this.selectedArea = this.tempSelectedArea;
+                    this.updatePreviewArea();
+                    this.closeAreaSelector();
+                    this.showStatus('區域選擇成功，可以開始監控了', 'success');
+                    this.log('確認選擇區域，準備開始監控');
+                    // start Monitoring
+                    setTimeout(() => this.startMonitoring(), 1000);
+                }
+            }
+            
+            cancelAreaSelection() {
+                this.closeAreaSelector();
+                this.tempSelectedArea = null;
+                this.log('取消區域選擇');
+            }
+            
+            closeAreaSelector() {
+                document.getElementById('areaSelectorOverlay').style.display = 'none';
+            }
+            
+            updatePreviewArea() {
+                const previewArea = document.getElementById('previewArea');
+                const previewCanvas = document.getElementById('selectedAreaPreview');
+                const areaInfo = document.getElementById('areaInfo');
+                const areaCoords = document.getElementById('areaCoords');
+                const areaSize = document.getElementById('areaSize');
+                
+                if (this.selectedArea) {
+                    previewArea.classList.add('has-selection');
+                    previewArea.querySelector('p').style.display = 'none';
+                    previewCanvas.style.display = 'block';
+                    areaInfo.style.display = 'block';
+                    
+                    // update selectedArea
+                    areaCoords.textContent = `(${Math.round(this.selectedArea.x)}, ${Math.round(this.selectedArea.y)})`;
+                    areaSize.textContent = `${Math.round(this.selectedArea.width)} × ${Math.round(this.selectedArea.height)}`;
+                    
+                    // update preview
+                    this.updateAreaPreview();
+                } else {
+                    previewArea.classList.remove('has-selection');
+                    previewArea.querySelector('p').style.display = 'block';
+                    previewCanvas.style.display = 'none';
+                    areaInfo.style.display = 'none';
+                }
+            }
+            
+            updateAreaPreview() {
+                if (!this.selectedArea || !this.video || !this.isMonitoring) return;
+                
+                const previewCanvas = document.getElementById('selectedAreaPreview');
+                const previewCtx = previewCanvas.getContext('2d');
+                
+
+                previewCanvas.width = this.selectedArea.width;
+                previewCanvas.height = this.selectedArea.height;
+
+                // Capture and display the selected area
+                this.ctx.drawImage(this.video, 0, 0);
+                const imageData = this.ctx.getImageData(
+                    this.selectedArea.x,
+                    this.selectedArea.y,
+                    this.selectedArea.width,
+                    this.selectedArea.height
+                );
+
+                previewCtx.putImageData(imageData, 0, 0);
+            }
+            
+            startMonitoring() {
+                if (!this.selectedArea) {
+                    this.showStatus('請先選擇監控區域', 'error');
+                    return;
+                }
+                this.isMonitoring = true;
+                this.startTime = Date.now();
+                this.initExpNum = null;
+                this.monitorInterval = setInterval(() => {
+                    if (!this.isMonitoring) {
+                        return;
+                    }
+                    // Set initial experience when first updating
+                    if (!this.hasSetInitialExp && this.initExpNum!=null) {
+                        document.getElementById('initExp').textContent = this.initExpNum;
+                        this.hasSetInitialExp = true;
+                    }
+                    this.updateMonitorTime();
+                    const monitorTime = document.getElementById('monitorTime').textContent;
+                    if (monitorTime === this.timeupMin+"分"+this.timeupSec+"秒") {
+                        this.stopMonitoring();
+                        this.calculateExpRates();
+                        this.stopCapture();
+                        this.log("計算已取消");
+                        return;
+                    }
+                    if (this.isProcessingOCR) return;
+                    this.captureAndAnalyze();
+                }, 1000); // check per 1 sec
+                this.showStatus('監控已開始', 'success');
+                this.log('開始監控經驗值');
+            }
+            
+            stopMonitoring() {
+                this.isMonitoring = false;
+                this.hasSetInitialExp = false;
+                if (this.monitorInterval) {
+                    clearInterval(this.monitorInterval);
+                    this.monitorInterval = null;
+                }
+                this.log('停止監控');
+            }
+            
+            async captureAndAnalyze() {
+                if (!this.isMonitoring || !this.video || !this.selectedArea) return;
+                if (this.isProcessingOCR) return; 
+                this.isProcessingOCR = true;
+                try {
+                    // Capture Selected Area
+                    this.ctx.drawImage(this.video, 0, 0);
+                    const imageData = this.ctx.getImageData(
+                        this.selectedArea.x,
+                        this.selectedArea.y,
+                        this.selectedArea.width,
+                        this.selectedArea.height
+                    );
+
+                    // Creating a canvas for OCR
+                    const expCanvas = document.createElement('canvas');
+                    expCanvas.width = this.selectedArea.width;
+                    expCanvas.height = this.selectedArea.height;
+                    const expCtx = expCanvas.getContext('2d');
+                    expCtx.putImageData(imageData, 0, 0);
+
+                    this.updateAreaPreview();
+                    // OCR recognition
+                    const result = await Tesseract.recognize(expCanvas, 'eng', {
+                        whitelist: '0123456789/,',
+                        tessedit_pageseg_mode: '7'
+                    });
+                    
+                    const expText = result.data.text.trim();
+                    if (expText) {
+                        this.log(`OCR 識別: ${expText}`);
+                        this.parseExpData(expText);
+                    }
+                } catch (error) {
+                    this.log('分析出錯: ' + error.message);
+                } finally {
+                    this.isProcessingOCR = false;
+                }
+            }
+            
+            parseExpData(text) {
+                const expMatch = text.replace(/,/g, '').match(/(\d+)\/(\d+)/);
+                
+                if (expMatch) {
+                    const current = parseInt(expMatch[1]);
+                    const total = parseInt(expMatch[2]);
+                    this.updateExpData(current, total, text);
+                } else {
+                    // Try to parse pure numbers
+                    const numberMatch = text.replace(/,/g, '').match(/(\d{3,})/);
+                    if (numberMatch) {
+                        const current = parseInt(numberMatch[1]);
+                        this.updateExpData(current, null, text);
+                    }
+                }
+            }
+            
+            updateExpData(current, total, originalText) {
+                const now = Date.now();
+
+                if(!this.expHistory) {
+                    this.initExpNum = current
+                }
+
+                const expDisplay = total ? `${current}/${total}` : `${current}`;
+                document.getElementById('currentExp').textContent = expDisplay;
+
+                this.log(`更新經驗值: ${expDisplay}`);
+            }
+
+            calculateExpRates() {
+                const initExp = parseInt(document.getElementById('initExp').textContent, 10);
+                const currentExp = parseInt(document.getElementById('currentExp').textContent.replace(/[^0-9]/g, ''), 10);
+
+                if (isNaN(initExp) || isNaN(currentExp)) {
+                    this.log("initExp 或 currentExp 無效");
+                    return;
+                }
+
+                const expDiff = currentExp - initExp;
+
+                document.getElementById('expDiff').textContent = expDiff;
+
+                this.log(`過去增加經驗: ${expDiff}`);
+            }
+
+            updateMonitorTime() {
+                if (!this.startTime || !this.isMonitoring) return;
+                
+                const elapsed = Date.now() - this.startTime;
+                const minutes = Math.floor(elapsed / 60000);
+                const seconds = Math.floor((elapsed % 60000) / 1000);
+                
+                document.getElementById('monitorTime').textContent = `${minutes}分${seconds}秒`;
+            }
+            
+            showStatus(message, type) {
+                const statusEl = document.getElementById('statusMessage');
+                statusEl.textContent = message;
+                statusEl.className = `status ${type}`;
+                statusEl.style.display = 'block';
+                
+                // auto hide after 3 sec
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 3000);
+            }
+            
+            log(message) {
+                const logEl = document.getElementById('monitorLog');
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `[${timestamp}] ${message}\n`;
+                
+                logEl.textContent += logEntry;
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+        }
+
+        // Initialize the application
+        const monitor = new ExpMonitor();
+    </script>
+</body>
+</html>
