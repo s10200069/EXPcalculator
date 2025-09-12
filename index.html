@@ -356,8 +356,8 @@
                 this.monitorInterval = null;
                 this.tenMinuteTimeout = null;
                 this.isProcessingOCR = false;
-                this.timeupMin = "10";
-                this.timeupSec = "0"
+                this.timeupMin = "0";
+                this.timeupSec = "10"
                 this.init();
             }
             
@@ -430,7 +430,7 @@
 
                 this.selectedArea = null;
                 this.updatePreviewArea();
-                this.initExpNum = null;
+                //this.initExpNum = null; //TODO test
                 this.showStatus('已停止所有監控', 'info');
                 this.log('螢幕捕獲停止');
             }
@@ -524,6 +524,7 @@
             confirmAreaSelection() {
                 if (this.tempSelectedArea) {
                     this.selectedArea = this.tempSelectedArea;
+                    this.resetStats();
                     this.updatePreviewArea();
                     this.closeAreaSelector();
                     this.showStatus('區域選擇成功，可以開始監控了', 'success');
@@ -612,8 +613,8 @@
                     this.updateMonitorTime();
                     const monitorTime = document.getElementById('monitorTime').textContent;
                     if (monitorTime === this.timeupMin+"分"+this.timeupSec+"秒") {
-                        this.stopMonitoring();
-                        this.calculateExpRates();
+                        //this.stopMonitoring(); TODO test
+                        //this.calculateExpRates();
                         this.stopCapture();
                         this.log("計算已取消");
                         return;
@@ -676,6 +677,8 @@
             }
             
             parseExpData(text) {
+                if (!this.isMonitoring) return;
+
                 const expMatch = text.replace(/,/g, '').match(/(\d+)\/(\d+)/);
                 
                 if (expMatch) {
@@ -693,6 +696,8 @@
             }
             
             updateExpData(current, total, originalText) {
+                if (!this.isMonitoring) return;
+
                 const now = Date.now();
 
                 if(!this.expHistory) {
@@ -750,6 +755,15 @@
                 
                 logEl.textContent += logEntry;
                 logEl.scrollTop = logEl.scrollHeight;
+            }
+
+            resetStats() {
+                // reset all data as "--"
+                document.getElementById('initExp').textContent = '--';
+                document.getElementById('currentExp').textContent = '--';
+                document.getElementById('expDiff').textContent = '--';
+                document.getElementById('monitorTime').textContent = '--';
+                this.log('統計數據已重置');
             }
         }
 
