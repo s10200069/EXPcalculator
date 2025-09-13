@@ -513,7 +513,7 @@
 
                 this.selectedArea = null;
                 this.updatePreviewArea();
-                //this.initExpNum = null; //TODO test
+                this.initExpNum = null; 
                 this.showStatus('已停止所有監控', 'info');
                 this.log('螢幕捕獲停止');
             }
@@ -683,7 +683,6 @@
                 }
                 this.isMonitoring = true;
                 this.startTime = Date.now();
-                this.initExpNum = null;
                 this.monitorInterval = setInterval(() => {
                     if (!this.isMonitoring) {
                         return;
