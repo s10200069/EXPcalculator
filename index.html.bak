@@ -327,18 +327,27 @@
 </head>
 <body>
     <div class="container">
-        <h1>
-            遊戲經驗值監控工具
-            <span id="version" class="version-tag"></span>
-        </h1>
+        <h1>遊戲經驗值監控工具</h1>
         
         <!-- options area  -->
         <div class="options">
             <div class="option-group">
-                <h4>測試時間模式</h4>
+                <h4>🔍 文字處理模式</h4>
+                <label>
+                    <input type="radio" name="filterMode" value="regex" checked>
+                    正規表達式過濾（精確識別）
+                </label>
+                <label>
+                    <input type="radio" name="filterMode" value="general">
+                    一般裁切（快速識別）
+                </label>
+            </div>
+            
+            <div class="option-group">
+                <h4>⏱️ 測試時間模式</h4>
                 <label>
                     <input type="radio" name="timeMode" value="limited" checked>
-                    預設時間測試（<span id="timeLimitText"></span>）
+                    預設時間測試（10秒）
                 </label>
                 <label>
                     <input type="radio" name="timeMode" value="unlimited">
@@ -348,9 +357,9 @@
         </div>
         
         <div class="controls">
-            <button id="startCapture">開始螢幕擷取</button>
-            <button id="stopCapture" disabled>停止監控</button>
-            <button id="selectArea" disabled>選擇經驗值區域</button>
+            <button id="startCapture">🎥 開始螢幕擷取</button>
+            <button id="stopCapture" disabled>⏹️ 停止監控</button>
+            <button id="selectArea" disabled>📍 選擇經驗值區域</button>
         </div>
         
         <!-- status-display -->
@@ -426,8 +435,10 @@
                 this.monitorInterval = null;
                 this.tenMinuteTimeout = null;
                 this.isProcessingOCR = false;
-                this.timeupMin = "10";
-                this.timeupSec = "0";
+                this.timeupMin = "0";
+                this.timeupSec = "10";
+                
+                this.filterMode = 'regex'; // 'regex' or 'general'
                 this.timeMode = 'limited'; // 'limited' or 'unlimited'
                 this.version = '1.0.0';
                 
@@ -447,16 +458,21 @@
                 document.getElementById('confirmSelection').onclick = () => this.confirmAreaSelection();
                 document.getElementById('cancelSelection').onclick = () => this.cancelAreaSelection();
                 
+                // Monitor option changes
+                document.querySelectorAll('input[name="filterMode"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        this.filterMode = e.target.value;
+                        this.log(`文字處理模式已切換為: ${this.filterMode === 'regex' ? '正規表達式過濾' : '一般裁切'}`);
+                    });
+                });
+                
                 document.querySelectorAll('input[name="timeMode"]').forEach(radio => {
                     radio.addEventListener('change', (e) => {
                         this.timeMode = e.target.value;
                         this.log(`測試時間模式已切換為: ${this.timeMode === 'limited' ? '預設時間測試' : '無限制時間測試'}`);
                     });
                 });
-
-                document.getElementById('timeLimitText').textContent = `${this.timeupMin}分${this.timeupSec}秒`;
-                document.getElementById('version').textContent = `v${this.version}`;
-
+                
                 this.log('系統已準備就緒');
             }
             
@@ -708,7 +724,7 @@
                 
                 const timeMsg = this.timeMode === 'limited' ? `（限制${this.timeupMin}分${this.timeupSec}秒）` : '（無時間限制）';
                 this.showStatus(`監控已開始${timeMsg}`, 'success');
-                this.log(`開始監控經驗值`);
+                this.log(`開始監控經驗值 - 文字處理模式: ${this.filterMode === 'regex' ? '正規表達式過濾' : '一般裁切'}`);
                 this.log(`時間模式: ${this.timeMode === 'limited' ? '預設時間測試' : '無限制時間測試'}`);
             }
             
@@ -726,7 +742,6 @@
                 if (!this.isMonitoring || !this.video || !this.selectedArea) return;
                 if (this.isProcessingOCR) return; 
                 this.isProcessingOCR = true;
-
                 try {
                     // Capture Selected Area
                     this.ctx.drawImage(this.video, 0, 0);
@@ -737,59 +752,61 @@
                         this.selectedArea.height
                     );
 
-                    // Creating a canvas for OCR with image preprocessing
+                    // Creating a canvas for OCR
                     const expCanvas = document.createElement('canvas');
                     expCanvas.width = this.selectedArea.width;
                     expCanvas.height = this.selectedArea.height;
                     const expCtx = expCanvas.getContext('2d');
                     expCtx.putImageData(imageData, 0, 0);
 
-                    // Preprocess image (contrast, grayscale, etc.)
-                    this.preprocessImage(expCtx, expCanvas.width, expCanvas.height);
-
                     this.updateAreaPreview();
-
+                    
+                    // Set OCR options according to processing mode
                     let ocrOptions = {
-                        tessedit_pageseg_mode: '7',       // single text
-                        tessedit_ocr_engine_mode: '1',     // neural network
-                        tessedit_char_whitelist: '0123456789' // 只偵測數字
+                        tessedit_pageseg_mode: '7'
                     };
-
-                    // OCR recognition
-                    const result = await Tesseract.recognize(expCanvas, 'eng', { ...ocrOptions });
-
-                    const expText = result.data.text.trim();
-
-                    // Compute average confidence
-                    const avgConfidence = result.data.words.reduce((sum, word) => sum + word.confidence, 0) / result.data.words.length;
-
-                    if (expText) {
-                        this.log(`OCR 識別 : ${expText} (信心度: ${avgConfidence.toFixed(1)}%)`);
-                        this.parseExpData(expText);
+                    
+                    if (this.filterMode === 'regex') {
+                        // Regular Expression Pattern - Recognize only numbers
+                        ocrOptions.whitelist = '0123456789';
                     } else {
-                        this.log(`OCR 未辨識到有效文字 (信心度: ${avgConfidence.toFixed(1)}%)`);
+                        // Normal cropping mode - recognizes all characters
+                        ocrOptions.whitelist = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz/,';
                     }
-
+                    
+                    // OCR recognition
+                    const result = await Tesseract.recognize(expCanvas, 'eng', ocrOptions);
+                    
+                    const expText = result.data.text.trim();
+                    if (expText) {
+                        this.log(`OCR 識別 (${this.filterMode === 'regex' ? '正規' : '一般'}): ${expText}`);
+                        this.parseExpData(expText);
+                    }
                 } catch (error) {
                     this.log('分析出錯: ' + error.message);
                 } finally {
                     this.isProcessingOCR = false;
                 }
             }
-
+            
             parseExpData(text) {
                 if (!this.isMonitoring) return;
-                const numberMatch = cleanText.match(/(\d+)/);
-                if (numberMatch) {
-                    const expValue = parseInt(numberMatch[1]);
-                    this.log(`提取到數字: ${expValue}`);
-                    this.updateExpData(expValue, null, expValue.toString());
+
+                const expMatch = text.replace(/,/g, '').match(/(\d+)\/(\d+)/);
+                
+                if (expMatch) {
+                    const current = parseInt(expMatch[1]);
+                    const total = parseInt(expMatch[2]);
+                    this.updateExpData(current, total, text);
                 } else {
-                    this.log(`無法提取經驗值: 原始"${text}" -> 清理後"${cleanText}"`);
+                    // Try to parse pure numbers
+                    const numberMatch = text.replace(/,/g, '').match(/(\d{3,})/);
+                    if (numberMatch) {
+                        const current = parseInt(numberMatch[1]);
+                        this.updateExpData(current, null, text);
+                    }
                 }
             }
-
-
             
             updateExpData(current, total, originalText) {
                 if (!this.isMonitoring) return;
@@ -860,28 +877,6 @@
                 document.getElementById('expDiff').textContent = '--';
                 document.getElementById('monitorTime').textContent = '--';
                 this.log('統計數據已重置');
-            }
-
-            preprocessImage(ctx, width, height) {
-                const imageData = ctx.getImageData(0, 0, width, height);
-                const data = imageData.data;
-                
-                // Convert to grayscale and increase contrast
-                for (let i = 0; i < data.length; i += 4) {
-                    // Grayscale
-                    const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-                    
-                    // Increase contrast (simple thresholding)
-                    const threshold = 128;
-                    const processed = gray > threshold ? 255 : 0;
-                    
-                    data[i] = processed;     // Red
-                    data[i + 1] = processed; // Green  
-                    data[i + 2] = processed; // Blue
-                    // Alpha remains unchanged
-                }
-                
-                ctx.putImageData(imageData, 0, 0);
             }
         }
 
