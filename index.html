@@ -779,17 +779,15 @@
 
             parseExpData(text) {
                 if (!this.isMonitoring) return;
-                const numberMatch = cleanText.match(/(\d+)/);
+                const numberMatch = text.match(/(\d+)/);
                 if (numberMatch) {
                     const expValue = parseInt(numberMatch[1]);
                     this.log(`提取到數字: ${expValue}`);
                     this.updateExpData(expValue, null, expValue.toString());
                 } else {
-                    this.log(`無法提取經驗值: 原始"${text}" -> 清理後"${cleanText}"`);
+                    this.log(`無法提取經驗值: 原始"${text}"`);
                 }
             }
-
-
             
             updateExpData(current, total, originalText) {
                 if (!this.isMonitoring) return;
