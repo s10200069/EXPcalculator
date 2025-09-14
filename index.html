@@ -430,7 +430,7 @@
                 this.timeupSec = "0";
                 this.timeMode = 'limited'; // 'limited' or 'unlimited'
                 this.version = '1.0.0';
-                
+                this.confidence_threshold  = 40;
                 this.init();
             }
             
@@ -747,11 +747,14 @@
                     this.preprocessImage(expCtx, expCanvas.width, expCanvas.height);
 
                     this.updateAreaPreview();
-
                     let ocrOptions = {
-                        tessedit_pageseg_mode: '7',       // single text
-                        tessedit_ocr_engine_mode: '1',     // neural network
-                        tessedit_char_whitelist: '0123456789' // 只偵測數字
+                        tessedit_pageseg_mode: '7',              // Single line of digits
+                        tessedit_ocr_engine_mode: '1',           // LSTM only
+                        tessedit_char_whitelist: '0123456789[].%',  // Allow only digits and specific symbols ([, ], ., %)
+                        tessedit_digit_mode: '1',                // Enable digit mode
+                        classify_bln_numeric_mode: '1',          // Bias more strongly toward digits
+                        load_system_dawg: 'F',                   // Disable system dictionary
+                        load_freq_dawg: 'F'                      // Disable frequent-word dictionary
                     };
 
                     // OCR recognition
@@ -763,8 +766,12 @@
                     const avgConfidence = result.data.words.reduce((sum, word) => sum + word.confidence, 0) / result.data.words.length;
 
                     if (expText) {
-                        this.log(`OCR 識別 : ${expText} (信心度: ${avgConfidence.toFixed(1)}%)`);
-                        this.parseExpData(expText);
+                        if (avgConfidence >= this.confidence_threshold) {
+                            this.log(`OCR 識別: ${expText} (信心度: ${avgConfidence.toFixed(1)}%)`);
+                            this.parseExpData(expText);
+                        } else {
+                            this.log(`OCR 識別結果信心度太低，暫不使用: ${expText} (信心度: ${avgConfidence.toFixed(1)}%)`);
+                        }
                     } else {
                         this.log(`OCR 未辨識到有效文字 (信心度: ${avgConfidence.toFixed(1)}%)`);
                     }
