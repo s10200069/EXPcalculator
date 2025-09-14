@@ -492,7 +492,6 @@
                     };
                     
                 } catch (err) {
-                    console.error('無法開始螢幕捕獲:', err);
                     this.showStatus('無法開始螢幕捕獲，請確保瀏覽器支援並給予權限', 'error');
                     this.log('錯誤: ' + err.message);
                 }
@@ -777,6 +776,7 @@
                     }
 
                 } catch (error) {
+					this.showStatus('分析出錯', 'error');
                     this.log('分析出錯: ' + error.message);
                 } finally {
                     this.isProcessingOCR = false;
@@ -791,6 +791,7 @@
                     this.log(`提取到數字: ${expValue}`);
                     this.updateExpData(expValue, null, expValue.toString());
                 } else {
+					this.showStatus('無法提取經驗值', 'error');
                     this.log(`無法提取經驗值: 原始"${text}"`);
                 }
             }
