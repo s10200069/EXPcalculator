@@ -83,6 +83,11 @@
             transform: scale(1.2);
         }
 
+        #resetLog {
+            background: #f39c12;
+            color: white;
+        }
+
         #startCapture {
             background: #4CAF50;
             color: white;
@@ -301,8 +306,8 @@
 
         .log-section h3 {
             color: #333;
-            border-bottom: 2px solid #eee;
-            padding-bottom: 10px;
+            padding-bottom: 0;
+            margin: 0;
         }
 
         #monitorLog {
@@ -315,6 +320,7 @@
             font-family: 'Courier New', monospace;
             font-size: 12px;
             line-height: 1.4;
+            white-space: pre-line;
         }
 
         /* RWD design */
@@ -322,6 +328,22 @@
             .options {
                 grid-template-columns: 1fr;
             }
+        }
+
+        .log-header {
+            display: flex;
+            align-items: center; 
+            gap: 10px;           
+        }
+
+        .log-divider {
+            border: none;
+            border-top: 5px solid #ccc;
+            margin: 10px 0;
+        }
+
+        .mg-0 {
+            margin: 0;
         }
     </style>
 </head>
@@ -387,7 +409,11 @@
         
         <!-- log-section -->
         <div class="log-section">
-            <h3>監控日誌</h3>
+            <div class="log-header">
+                <h3>監控日誌</h3>
+                <div class="controls mg-0"><button id="resetLog">清空日誌內容</button></div>
+            </div>
+            <hr class="log-divider">
             <div id="monitorLog"></div>
         </div>
         
@@ -442,6 +468,7 @@
                 document.getElementById('startCapture').onclick = () => this.startCapture();
                 document.getElementById('stopCapture').onclick = () => this.stopCapture();
                 document.getElementById('selectArea').onclick = () => this.showAreaSelector();
+                document.getElementById('resetLog').onclick = () => this.resetLog();
                 
                 // selector-event
                 document.getElementById('confirmSelection').onclick = () => this.confirmAreaSelection();
@@ -856,7 +883,7 @@
                 
                 logEl.textContent += logEntry;
                 logEl.scrollTop = logEl.scrollHeight;
-            }
+            }    
 
             resetStats() {
                 // reset all data as "--"
@@ -887,6 +914,10 @@
                 }
                 
                 ctx.putImageData(imageData, 0, 0);
+            }
+
+            resetLog() {
+                document.getElementById('monitorLog').innerHTML = '';
             }
         }
 
