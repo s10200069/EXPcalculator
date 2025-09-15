@@ -455,8 +455,8 @@
                 this.timeupMin = "10";
                 this.timeupSec = "0";
                 this.timeMode = 'limited'; // 'limited' or 'unlimited'
-                this.version = '1.0.0';
-                this.confidence_threshold  = 40;
+                this.version = '1.0.1';
+                this.confidence_threshold  = 20;
                 this.init();
             }
             
@@ -539,7 +539,6 @@
 
                 this.selectedArea = null;
                 this.updatePreviewArea();
-                this.initExpNum = null; 
                 this.showStatus('已停止所有監控', 'info');
                 this.log('螢幕捕獲停止');
             }
@@ -633,7 +632,7 @@
             confirmAreaSelection() {
                 if (this.tempSelectedArea) {
                     this.selectedArea = this.tempSelectedArea;
-                    this.resetStats();
+                    this.resetStatus();
                     this.updatePreviewArea();
                     this.closeAreaSelector();
                     this.showStatus('區域選擇成功，可以開始監控了', 'success');
@@ -709,6 +708,8 @@
                 }
                 this.isMonitoring = true;
                 this.startTime = Date.now();
+                this.initExpNum = null; 
+                this.hasSetInitialExp = false;
                 this.monitorInterval = setInterval(() => {
                     if (!this.isMonitoring) {
                         return;
@@ -739,7 +740,6 @@
             
             stopMonitoring() {
                 this.isMonitoring = false;
-                this.hasSetInitialExp = false;
                 if (this.monitorInterval) {
                     clearInterval(this.monitorInterval);
                     this.monitorInterval = null;
@@ -828,7 +828,7 @@
 
                 const now = Date.now();
 
-                if(!this.expHistory) {
+                if(!this.initExpNum) {
                     this.initExpNum = current
                 }
 
@@ -885,7 +885,7 @@
                 logEl.scrollTop = logEl.scrollHeight;
             }    
 
-            resetStats() {
+            resetStatus() {
                 // reset all data as "--"
                 document.getElementById('initExp').textContent = '--';
                 document.getElementById('currentExp').textContent = '--';
