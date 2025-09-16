@@ -1,3 +1,4 @@
+tesseract.min.js version : 5<br>
 使用教學
 1. 選擇測試時間模式
 2. 點選開始螢幕擷取，選取遊戲畫面
