@@ -447,16 +447,17 @@
                 this.isMonitoring = false;
                 this.hasSetInitialExp = false;
                 this.selectedArea = null;
-                this.initExpNum = null;
                 this.startTime = null;
                 this.monitorInterval = null;
                 this.tenMinuteTimeout = null;
                 this.isProcessingOCR = false;
-                this.timeupMin = "10";
-                this.timeupSec = "0";
+                this.timeupMin = 10;
+                this.timeupSec = 0;
                 this.timeMode = 'limited'; // 'limited' or 'unlimited'
-                this.version = '1.0.1';
-                this.confidence_threshold  = 20;
+                this.version = '1.0.2';
+                this.confidence_threshold  = 20;   
+                this.monitorIntervalSec = 2;    
+                this.timeLimitSec = this.timeupMin * 60 + this.timeupSec;
                 this.init();
             }
             
@@ -708,30 +709,41 @@
                 }
                 this.isMonitoring = true;
                 this.startTime = Date.now();
-                this.initExpNum = null; 
-                this.hasSetInitialExp = false;
-                this.monitorInterval = setInterval(() => {
-                    if (!this.isMonitoring) {
-                        return;
-                    }
-                    // Set initial experience when first updating
-                    if (!this.hasSetInitialExp && this.initExpNum!=null) {
-                        document.getElementById('initExp').textContent = this.initExpNum;
-                        this.hasSetInitialExp = true;
-                    }
-                    this.updateMonitorTime();
-                    const monitorTime = document.getElementById('monitorTime').textContent;
-                    
-                    // Determine whether to stop according to the time mode
-                    if (this.timeMode === 'limited' && monitorTime === this.timeupMin+"分"+this.timeupSec+"秒") {
+                this.hasSetInitialExp = false; 
+                let firstOCR = true;               
+
+                // --------------------------
+                // Start time and OCR interval
+                // --------------------------
+                this.timeDisplayInterval = setInterval(async () => {
+                    if (!this.isMonitoring) return;
+
+                    // Update elapsed time display
+                    const elapsedSec = Math.floor((Date.now() - this.startTime) / 1000);
+                    const minutes = Math.floor(elapsedSec / 60);
+                    const seconds = elapsedSec % 60;
+                    document.getElementById('monitorTime').textContent = `${minutes}分 ${seconds}秒`;
+
+                    // Check if time limit is reached
+                    if (this.timeMode === 'limited' && elapsedSec >= this.timeLimitSec) {
                         this.stopCapture();
                         this.log("測試時間到達，自動停止監控");
                         return;
                     }
-                    if (this.isProcessingOCR) return;
-                    this.captureAndAnalyze();
-                }, 1000); // check per 1 sec
-                
+
+                    // Perform OCR immediately for the first time, then every monitorIntervalSec seconds
+                    if ((firstOCR || elapsedSec % this.monitorIntervalSec === 0) && !this.isProcessingOCR) {
+                        await this.captureAndAnalyze();
+                        firstOCR = false; // reset after first run
+                    }
+
+                    // Set initial EXP display if not set yet
+                    if (!this.hasSetInitialExp && this.initExpNum != null) {
+                        document.getElementById('initExp').textContent = this.initExpNum;
+                        this.hasSetInitialExp = true;
+                    }
+                }, 1000); // Update every second
+
                 const timeMsg = this.timeMode === 'limited' ? `（限制${this.timeupMin}分${this.timeupSec}秒）` : '（無時間限制）';
                 this.showStatus(`監控已開始${timeMsg}`, 'success');
                 this.log(`開始監控經驗值`);
@@ -744,33 +756,31 @@
                     clearInterval(this.monitorInterval);
                     this.monitorInterval = null;
                 }
+                if (this.timeDisplayInterval) {
+                    clearInterval(this.timeDisplayInterval);
+                    this.timeDisplayInterval = null;
+                }
                 this.log('停止監控');
             }
             
             async captureAndAnalyze() {
                 if (!this.isMonitoring || !this.video || !this.selectedArea) return;
-                if (this.isProcessingOCR) return; 
                 this.isProcessingOCR = true;
 
                 try {
-                    // Capture Selected Area
-                    this.ctx.drawImage(this.video, 0, 0);
-                    const imageData = this.ctx.getImageData(
-                        this.selectedArea.x,
-                        this.selectedArea.y,
-                        this.selectedArea.width,
-                        this.selectedArea.height
-                    );
+                    const { x, y, width, height } = this.selectedArea;
 
-                    // Creating a canvas for OCR with image preprocessing
+                    // Create smaller canvas for OCR
                     const expCanvas = document.createElement('canvas');
-                    expCanvas.width = this.selectedArea.width;
-                    expCanvas.height = this.selectedArea.height;
+                    expCanvas.width = width;
+                    expCanvas.height = height;
                     const expCtx = expCanvas.getContext('2d');
-                    expCtx.putImageData(imageData, 0, 0);
+
+                    // Draw only selected area onto scaled canvas
+                    expCtx.drawImage(this.video, x, y, width, height, 0, 0, expCanvas.width, expCanvas.height);
 
                     // Preprocess image (contrast, grayscale, etc.)
-                    this.preprocessImage(expCtx, expCanvas.width, expCanvas.height);
+                    this.preprocessImage(expCtx, expCanvas.width, expCanvas.height); 
 
                     this.updateAreaPreview();
                     let ocrOptions = {
@@ -825,16 +835,13 @@
             
             updateExpData(current, total, originalText) {
                 if (!this.isMonitoring) return;
-
-                const now = Date.now();
-
-                if(!this.initExpNum) {
-                    this.initExpNum = current
+                // Set initial experience when first updating
+                if (!this.hasSetInitialExp) {
+                    document.getElementById('initExp').textContent = current;
+                    this.hasSetInitialExp = true;
                 }
-
                 const expDisplay = total ? `${current}/${total}` : `${current}`;
                 document.getElementById('currentExp').textContent = expDisplay;
-
                 this.log(`更新經驗值: ${expDisplay}`);
             }
 
@@ -853,16 +860,6 @@
 
                 this.log(`過去增加經驗: ${expDiff}`);
             }
-
-            updateMonitorTime() {
-                if (!this.startTime || !this.isMonitoring) return;
-                
-                const elapsed = Date.now() - this.startTime;
-                const minutes = Math.floor(elapsed / 60000);
-                const seconds = Math.floor((elapsed % 60000) / 1000);
-                
-                document.getElementById('monitorTime').textContent = `${minutes}分${seconds}秒`;
-            }
             
             showStatus(message, type) {
                 const statusEl = document.getElementById('statusMessage');
@@ -880,7 +877,6 @@
                 const logEl = document.getElementById('monitorLog');
                 const timestamp = new Date().toLocaleTimeString();
                 const logEntry = `[${timestamp}] ${message}\n`;
-                
                 logEl.textContent += logEntry;
                 logEl.scrollTop = logEl.scrollHeight;
             }    
@@ -894,25 +890,17 @@
                 this.log('統計數據已重置');
             }
 
+            
             preprocessImage(ctx, width, height) {
+                if(!this.isMonitoring) return;
                 const imageData = ctx.getImageData(0, 0, width, height);
                 const data = imageData.data;
                 
-                // Convert to grayscale and increase contrast
                 for (let i = 0; i < data.length; i += 4) {
-                    // Grayscale
-                    const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-                    
-                    // Increase contrast (simple thresholding)
-                    const threshold = 128;
-                    const processed = gray > threshold ? 255 : 0;
-                    
-                    data[i] = processed;     // Red
-                    data[i + 1] = processed; // Green  
-                    data[i + 2] = processed; // Blue
-                    // Alpha remains unchanged
+                    let avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                    let bin = avg > 128 ? 255 : 0; 
+                    data[i] = data[i + 1] = data[i + 2] = bin;
                 }
-                
                 ctx.putImageData(imageData, 0, 0);
             }
 
