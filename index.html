@@ -736,12 +736,6 @@
                         await this.captureAndAnalyze();
                         firstOCR = false; // reset after first run
                     }
-
-                    // Set initial EXP display if not set yet
-                    if (!this.hasSetInitialExp && this.initExpNum != null) {
-                        document.getElementById('initExp').textContent = this.initExpNum;
-                        this.hasSetInitialExp = true;
-                    }
                 }, 1000); // Update every second
 
                 const timeMsg = this.timeMode === 'limited' ? `（限制${this.timeupMin}分${this.timeupSec}秒）` : '（無時間限制）';
