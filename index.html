@@ -350,7 +350,7 @@
 <body>
     <div class="container">
         <h1>
-            遊戲經驗值監控工具
+            Artale遊戲經驗值監控工具
             <span id="version" class="version-tag"></span>
         </h1>
         
@@ -816,25 +816,24 @@
 
             parseExpData(text) {
                 if (!this.isMonitoring) return;
-                const numberMatch = text.match(/(\d+)/);
+                const numberMatch = text.match(/^(\d+)(?=[\[\(\{\/])/);
                 if (numberMatch) {
                     const expValue = parseInt(numberMatch[1]);
                     this.log(`提取到數字: ${expValue}`);
-                    this.updateExpData(expValue, null, expValue.toString());
+                    this.updateExpData(expValue);
                 } else {
-					this.showStatus('無法提取經驗值', 'error');
                     this.log(`無法提取經驗值: 原始"${text}"`);
                 }
             }
             
-            updateExpData(current, total, originalText) {
+            updateExpData(current) {
                 if (!this.isMonitoring) return;
                 // Set initial experience when first updating
                 if (!this.hasSetInitialExp) {
                     document.getElementById('initExp').textContent = current;
                     this.hasSetInitialExp = true;
                 }
-                const expDisplay = total ? `${current}/${total}` : `${current}`;
+                const expDisplay = `${current}`;
                 document.getElementById('currentExp').textContent = expDisplay;
                 this.log(`更新經驗值: ${expDisplay}`);
             }
